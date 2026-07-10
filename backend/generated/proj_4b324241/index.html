@@ -1,97 +1,24 @@
-import fetch from 'node-fetch';
-import { CONSTANTS } from '../../utils/constants.js';
-import { parseGeneratedCode } from '../../utils/helpers.js';
-
-export const generateCode = async (enhancedPrompt, answers = {}) => {
-  // Build context from Q&A answers
-  const qaContext = Object.entries(answers)
-    .map(([k, v]) => `- Q${k}: ${v}`)
-    .join('\n');
-
-  const fullPrompt = qaContext
-    ? `${enhancedPrompt}\n\n== Q&A REFINEMENTS ==\n${qaContext}`
-    : enhancedPrompt;
-
-  // Attempt 1: KrizVibe free API
-  try {
-    const res = await fetch(CONSTANTS.KRIZVIBE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: fullPrompt, format: 'html' }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const parsed = parseGeneratedCode(data.result || data.content || '');
-      if (parsed.html && parsed.html.includes('<!DOCTYPE')) {
-        console.log('[CodeGen] KrizVibe success');
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('[CodeGen] KrizVibe failed:', err.message);
-  }
-
-  // Fallback: built-in high-quality generator
-  console.log('[CodeGen] Using built-in fallback generator');
-  return generateFallbackWebsite(enhancedPrompt, answers);
-};
-
-const generateFallbackWebsite = (prompt, answers) => {
-  // Extract meaningful data from the prompt
-  const scopeMatch = prompt.match(/Type\/Scope:\s*([^\n]+)/i);
-  const motiveMatch = prompt.match(/Main Goal:\s*([^\n]+)/i);
-  const styleMatch = prompt.match(/Design Style:\s*([^\n]+)/i);
-
-  const scope = scopeMatch?.[1]?.trim() || 'Business';
-  const motive = motiveMatch?.[1]?.trim() || 'showcase our services';
-  const style = styleMatch?.[1]?.trim() || 'modern dark';
-
-  // Pick accent color based on style keywords
-  let accent = '#3b82f6';
-  let accentDark = '#1d4ed8';
-  let accentGlow = 'rgba(59,130,246,0.3)';
-  if (/gold|luxury|premium/i.test(style)) { accent = '#f59e0b'; accentDark = '#d97706'; accentGlow = 'rgba(245,158,11,0.3)'; }
-  if (/green|eco|nature/i.test(style)) { accent = '#10b981'; accentDark = '#059669'; accentGlow = 'rgba(16,185,129,0.3)'; }
-  if (/purple|creative/i.test(style)) { accent = '#8b5cf6'; accentDark = '#7c3aed'; accentGlow = 'rgba(139,92,246,0.3)'; }
-  if (/red|bold|energy/i.test(style)) { accent = '#ef4444'; accentDark = '#dc2626'; accentGlow = 'rgba(239,68,68,0.3)'; }
-
-  // Pick a Google Font based on style
-  let fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
-  let fontFamily = "'Inter', system-ui, sans-serif";
-  if (/luxury|elegant|fashion/i.test(style)) {
-    fontUrl = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500&display=swap';
-    fontFamily = "'Playfair Display', 'Inter', serif";
-  }
-
-  const siteName = scope.split(' ').slice(0, 3).join(' ');
-  const answersList = Object.entries(answers);
-  const q1Entry = answersList.find(([q]) => /product|service|model/i.test(q)) || answersList[0];
-  const q1Answer = q1Entry ? q1Entry[1] : '3D products and services';
-  const q3Entry = answersList.find(([q]) => /contact|email|form|chat/i.test(q)) || answersList[2];
-  const q3Answer = q3Entry ? (!/no|none|not applicable/i.test(q3Entry[1])) : false;
-
-  const html = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="${siteName} - ${motive}" />
-  <title>${siteName}</title>
+  <meta name="description" content="general portfolio - a developer to showcase his skills and work" />
+  <title>general portfolio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="stylesheet" href="${fontUrl}" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" />
   <style>
     :root {
-      --accent: ${accent};
-      --accent-dark: ${accentDark};
-      --accent-glow: ${accentGlow};
+      --accent: #3b82f6;
+      --accent-dark: #1d4ed8;
+      --accent-glow: rgba(59,130,246,0.3);
       --bg: #020617;
       --bg2: #0f172a;
       --bg3: #1e293b;
       --border: rgba(255,255,255,0.08);
       --text: #f1f5f9;
       --text-muted: #94a3b8;
-      --font: ${fontFamily};
+      --font: 'Inter', system-ui, sans-serif;
       --radius: 1rem;
       --shadow: 0 20px 60px rgba(0,0,0,0.4);
     }
@@ -216,12 +143,12 @@ const generateFallbackWebsite = (prompt, answers) => {
 
   <!-- NAVBAR -->
   <nav id="navbar">
-    <a href="#hero" class="nav-logo">${siteName}</a>
+    <a href="#hero" class="nav-logo">general portfolio</a>
     <ul class="nav-links" id="navLinks">
       <li><a href="#features">Features</a></li>
       <li><a href="#about">About</a></li>
       <li><a href="#products">Services</a></li>
-      ${q3Answer ? '<li><a href="#contact">Contact</a></li>' : ''}
+      
     </ul>
     <a href="#contact" class="nav-cta">Get Started</a>
     <div class="hamburger" id="hamburger" aria-label="Toggle menu" role="button" tabindex="0">
@@ -232,11 +159,11 @@ const generateFallbackWebsite = (prompt, answers) => {
   <!-- HERO -->
   <section id="hero">
     <div>
-      <div class="hero-badge">⚡ ${scope}</div>
+      <div class="hero-badge">⚡ general portfolio</div>
       <h1 class="hero-title">
-        Built to<br/><span>${motive.split(' ').slice(0, 4).join(' ')}</span>
+        Built to<br/><span>a developer to showcase</span>
       </h1>
-      <p class="hero-sub">Experience the next generation of ${scope.toLowerCase()}. Designed to ${motive.toLowerCase()}.</p>
+      <p class="hero-sub">Experience the next generation of general portfolio. Designed to a developer to showcase his skills and work.</p>
       <div class="hero-actions">
         <a href="#products" class="btn-primary">Explore Now →</a>
         <a href="#about" class="btn-outline">Learn More</a>
@@ -292,7 +219,7 @@ const generateFallbackWebsite = (prompt, answers) => {
         <div class="section-label">Our Story</div>
         <h2 class="section-title">Who We Are</h2>
         <p style="color:var(--text-muted); margin-bottom:1rem; line-height:1.8;">
-          We are a passionate team dedicated to delivering world-class ${scope.toLowerCase()} solutions. Our mission is to ${motive.toLowerCase()} while maintaining the highest standards of quality and innovation.
+          We are a passionate team dedicated to delivering world-class general portfolio solutions. Our mission is to a developer to showcase his skills and work while maintaining the highest standards of quality and innovation.
         </p>
         <div class="stats-grid">
           <div class="stat"><div class="stat-value">500+</div><div class="stat-label">Clients</div></div>
@@ -309,47 +236,38 @@ const generateFallbackWebsite = (prompt, answers) => {
   <section id="products">
     <div class="section-label" style="text-align:center">What We Offer</div>
     <h2 class="section-title" style="text-align:center;margin-bottom:0.5rem">Our Services</h2>
-    <p class="section-sub" style="text-align:center;margin:0 auto 0.5rem">Featuring: ${q1Answer}</p>
+    <p class="section-sub" style="text-align:center;margin:0 auto 0.5rem">Featuring: developer</p>
     <div class="products-grid">
-      ${['Premium Plan', 'Standard Plan', 'Enterprise Plan', 'Custom Solution'].map((name, i) => `
+      
       <div class="product-card">
-        <div class="product-icon">${['✦', '◈', '⬡', '★'][i]}</div>
-        <h3>${name}</h3>
-        <p>Tailored ${scope.toLowerCase()} solutions designed to maximize your results and exceed expectations.</p>
-      </div>`).join('')}
+        <div class="product-icon">✦</div>
+        <h3>Premium Plan</h3>
+        <p>Tailored general portfolio solutions designed to maximize your results and exceed expectations.</p>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">◈</div>
+        <h3>Standard Plan</h3>
+        <p>Tailored general portfolio solutions designed to maximize your results and exceed expectations.</p>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">⬡</div>
+        <h3>Enterprise Plan</h3>
+        <p>Tailored general portfolio solutions designed to maximize your results and exceed expectations.</p>
+      </div>
+      <div class="product-card">
+        <div class="product-icon">★</div>
+        <h3>Custom Solution</h3>
+        <p>Tailored general portfolio solutions designed to maximize your results and exceed expectations.</p>
+      </div>
     </div>
   </section>
 
   <!-- CONTACT (if Q3 answered yes) -->
-  ${q3Answer ? `
-  <section id="contact">
-    <div class="contact-inner">
-      <div class="section-label">Get In Touch</div>
-      <h2 class="section-title">Contact Us</h2>
-      <p class="section-sub">Have a question or ready to get started? Send us a message.</p>
-      <form class="contact-form" onsubmit="handleSubmit(event)">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" placeholder="Your name" required />
-          </div>
-          <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" placeholder="your@email.com" required />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="message">Message</label>
-          <textarea id="message" name="message" placeholder="Tell us about your project..." required></textarea>
-        </div>
-        <button type="submit" class="form-submit">Send Message →</button>
-      </form>
-    </div>
-  </section>` : ''}
+  
 
   <!-- FOOTER -->
   <footer>
-    <p>© ${new Date().getFullYear()} <a href="#hero">${siteName}</a>. All rights reserved. Built with ❤️ by MobileFirst3D.</p>
+    <p>© 2026 <a href="#hero">general portfolio</a>. All rights reserved. Built with ❤️ by MobileFirst3D.</p>
   </footer>
 
   <script>
@@ -370,7 +288,7 @@ const generateFallbackWebsite = (prompt, answers) => {
 
     // Stagger animations
     document.querySelectorAll('.feature-card, .product-card').forEach((el, i) => {
-      el.style.transitionDelay = \`\${i * 0.08}s\`;
+      el.style.transitionDelay = `${i * 0.08}s`;
     });
 
     // Contact form handler
@@ -393,7 +311,4 @@ const generateFallbackWebsite = (prompt, answers) => {
     });
   </script>
 </body>
-</html>`;
-
-  return { html, css: '', js: '' };
-};
+</html>

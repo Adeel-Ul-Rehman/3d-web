@@ -10,16 +10,17 @@ export const loopController = async ({
 }) => {
   let iteration = 0;
   let currentPrompt = enhancedPrompt;
-  let code = null;
-  let validationResult = null;
+  let bestCode = null;
+  let bestScore = -1;
+  let bestValidation = null;
   const iterationHistory = [];
 
   while (iteration < maxIterations) {
     iteration++;
     console.log(`[Loop] Iteration ${iteration}/${maxIterations}`);
 
-    code = await generateCode(currentPrompt, answers);
-    validationResult = await validateCode(code.html, code.css, code.js, enhancedPrompt);
+    const code = await generateCode(currentPrompt, answers);
+    const validationResult = await validateCode(code.html, code.css, code.js, enhancedPrompt);
 
     iterationHistory.push({
       iteration,
@@ -30,14 +31,26 @@ export const loopController = async ({
 
     console.log(`[Loop] Quality score: ${validationResult.score}% (threshold: ${threshold}%)`);
 
+    if (validationResult.score > bestScore) {
+      bestScore = validationResult.score;
+      bestCode = code;
+      bestValidation = validationResult;
+    }
+
     if (validationResult.passed) {
       console.log(`[Loop] Quality threshold met at iteration ${iteration}`);
       break;
     }
 
+    // Safety check: if score is extremely low or degrading, break early
+    if (iteration >= 2 && validationResult.score < bestScore - 15) {
+      console.log(`[Loop] Degradation detected, breaking loop early to prevent hallucination`);
+      break;
+    }
+
     if (iteration < maxIterations) {
       const feedback = `
-ISSUES FOUND IN PREVIOUS VERSION:
+ISSUES FOUND IN PREVIOUS VERSION (Score: ${validationResult.score}%):
 ${validationResult.issues.map(i => `- ${i}`).join('\n')}
 
 SUGGESTIONS TO IMPROVE:
@@ -50,14 +63,14 @@ Please fix all these issues while keeping all original requirements intact.
   }
 
   return {
-    html: code.html,
-    css: code.css,
-    js: code.js,
-    quality: validationResult?.score || 0,
+    html: bestCode.html,
+    css: bestCode.css,
+    js: bestCode.js,
+    quality: bestScore,
     iterations: iteration,
-    passed: validationResult?.passed || false,
-    issues: validationResult?.issues || [],
-    suggestions: validationResult?.suggestions || [],
+    passed: bestValidation?.passed || false,
+    issues: bestValidation?.issues || [],
+    suggestions: bestValidation?.suggestions || [],
     iterationHistory,
   };
 };

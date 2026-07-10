@@ -23,6 +23,20 @@ export const generateWebsite = async ({ template, prompt, answers, files = [] })
   return data;
 };
 
+// ─── Generate Dynamic Q&A Questions ─────────────────────────────────────────
+export const fetchDynamicQuestions = async ({ template, prompt }) => {
+  const res = await fetch(`${BASE_URL}/api/generate/questions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template, prompt }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error?.message || 'Failed to generate dynamic questions');
+  }
+  return data.questions;
+};
+
 // ─── Preview URL ─────────────────────────────────────────────────────────────
 export const getPreviewUrl = (projectId) =>
   `${BASE_URL}/api/preview/${projectId}`;

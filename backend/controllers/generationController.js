@@ -1,5 +1,23 @@
 import { runGenerationPipeline } from '../services/aiPipeline/orchestrator.js';
 import { createProject } from '../models/projectModel.js';
+import { generateDynamicQuestions } from '../services/aiPipeline/questionGenerator.js';
+
+export const getDynamicQuestions = async (req, res, next) => {
+  try {
+    const { template, prompt } = req.body;
+    if (!prompt) {
+      const err = new Error('Prompt data is required.');
+      err.statusCode = 400;
+      err.isFriendly = true;
+      return next(err);
+    }
+    const parsedPrompt = typeof prompt === 'string' ? JSON.parse(prompt) : prompt;
+    const questions = await generateDynamicQuestions(parsedPrompt);
+    res.json({ success: true, questions });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const generateWebsite = async (req, res, next) => {
   try {

@@ -31,7 +31,7 @@ export const runGenerationPipeline = async (userData) => {
     html: result.html,
     css: result.css,
     js: result.js,
-    assets: (files || []).map(f => ({ filename: f.originalname, buffer: f.buffer })),
+    assets: (files || []).map(f => ({ filename: f.filename || f.originalname, buffer: f.buffer })),
   });
 
   // Step 4: Create ZIP archive
