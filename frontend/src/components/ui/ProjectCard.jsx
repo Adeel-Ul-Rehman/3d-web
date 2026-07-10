@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../common/Button';
 
-const ProjectCard = ({ project }) => {
+const ProjectCard = ({ project, onDelete }) => {
   return (
     <div className="glass-effect rounded-2xl overflow-hidden card-hover">
       <div className="aspect-video bg-gradient-to-br from-dark-700 to-dark-800 flex items-center justify-center relative">
@@ -22,7 +22,12 @@ const ProjectCard = ({ project }) => {
             <Link to="/preview" state={{ project }}>
               <Button variant="ghost" size="sm">View</Button>
             </Link>
-            <Button variant="ghost" size="sm" className="text-rose-500 hover:text-rose-400">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-rose-500 hover:text-rose-400"
+              onClick={onDelete}
+            >
               Delete
             </Button>
           </div>
