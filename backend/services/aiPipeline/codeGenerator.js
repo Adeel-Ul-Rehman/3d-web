@@ -2,10 +2,10 @@ import fetch from 'node-fetch';
 import { CONSTANTS } from '../../utils/constants.js';
 import { parseGeneratedCode } from '../../utils/helpers.js';
 
-export const generateCode = async (enhancedPrompt, answers = {}) => {
+export const generateCode = async (enhancedPrompt, answers = {}, template = '', files = []) => {
   // Build context from Q&A answers
   const qaContext = Object.entries(answers)
-    .map(([k, v]) => `- Q${k}: ${v}`)
+    .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
   const fullPrompt = qaContext
@@ -32,44 +32,236 @@ export const generateCode = async (enhancedPrompt, answers = {}) => {
     console.warn('[CodeGen] KrizVibe failed:', err.message);
   }
 
-  // Fallback: built-in high-quality generator
+  // Fallback: built-in high-quality template-specific generator
   console.log('[CodeGen] Using built-in fallback generator');
-  return generateFallbackWebsite(enhancedPrompt, answers);
+  return generateFallbackWebsite(enhancedPrompt, answers, template, files);
 };
 
-const generateFallbackWebsite = (prompt, answers) => {
-  // Extract meaningful data from the prompt
+const generateFallbackWebsite = (prompt, answers, template, files) => {
+  // 1. Parse template name — check `template` arg first, then fall back to prompt section
+  let templateName = 'default';
+  if (template && typeof template === 'string') {
+    try {
+      const parsedT = JSON.parse(template);
+      templateName = parsedT.name || template;
+    } catch (_) {
+      templateName = template; // plain string like "3D Luxury Showroom"
+    }
+  } else if (template && typeof template === 'object') {
+    templateName = template.name || 'default';
+  }
+
+  // Also parse from the structured prompt if template arg is still default/empty
+  if (!templateName || templateName === 'default' || templateName === '{}') {
+    const tplMatch = prompt.match(/== SELECTED TEMPLATE ==\s*\n([^\n=]+)/i);
+    if (tplMatch) templateName = tplMatch[1].trim();
+  }
+
+  // 2. Extract scope/motive/style/boundaries from prompt
   const scopeMatch = prompt.match(/Type\/Scope:\s*([^\n]+)/i);
   const motiveMatch = prompt.match(/Main Goal:\s*([^\n]+)/i);
   const styleMatch = prompt.match(/Design Style:\s*([^\n]+)/i);
+  const boundariesMatch = prompt.match(/Constraints:\s*([^\n]+)/i);
+
 
   const scope = scopeMatch?.[1]?.trim() || 'Business';
   const motive = motiveMatch?.[1]?.trim() || 'showcase our services';
   const style = styleMatch?.[1]?.trim() || 'modern dark';
+  const boundaries = boundariesMatch?.[1]?.trim() || '';
 
-  // Pick accent color based on style keywords
+  const siteName = scope.split(' ').slice(0, 3).join(' ');
+
+  // 3. Scan user files/assets
+  const glbFile = files.find(f => {
+    const name = (f.filename || f.originalname || '').toLowerCase();
+    return name.endsWith('.glb') || name.endsWith('.gltf');
+  });
+  const logoFile = files.find(f => {
+    const name = (f.filename || f.originalname || '').toLowerCase();
+    return /logo/i.test(name) && name.match(/\.(jpg|jpeg|png|webp|svg)$/i);
+  });
+  const imageFiles = files.filter(f => {
+    const name = (f.filename || f.originalname || '').toLowerCase();
+    return !/logo/i.test(name) && name.match(/\.(jpg|jpeg|png|webp|svg)$/i);
+  });
+
+  // 4. Style Customization based on prompt style keywords
+  let isLight = /light|white|clean light/i.test(style) || /light|white/i.test(boundaries);
+  let bg = isLight ? '#f8fafc' : '#020617';
+  let bg2 = isLight ? '#f1f5f9' : '#0f172a';
+  let bg3 = isLight ? '#ffffff' : '#1e293b';
+  let text = isLight ? '#0f172a' : '#f1f5f9';
+  let textMuted = isLight ? '#475569' : '#94a3b8';
+  let border = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)';
+
+  // Accent Colors scan
   let accent = '#3b82f6';
   let accentDark = '#1d4ed8';
   let accentGlow = 'rgba(59,130,246,0.3)';
-  if (/gold|luxury|premium/i.test(style)) { accent = '#f59e0b'; accentDark = '#d97706'; accentGlow = 'rgba(245,158,11,0.3)'; }
-  if (/green|eco|nature/i.test(style)) { accent = '#10b981'; accentDark = '#059669'; accentGlow = 'rgba(16,185,129,0.3)'; }
-  if (/purple|creative/i.test(style)) { accent = '#8b5cf6'; accentDark = '#7c3aed'; accentGlow = 'rgba(139,92,246,0.3)'; }
-  if (/red|bold|energy/i.test(style)) { accent = '#ef4444'; accentDark = '#dc2626'; accentGlow = 'rgba(239,68,68,0.3)'; }
 
-  // Pick a Google Font based on style
-  let fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
-  let fontFamily = "'Inter', system-ui, sans-serif";
-  if (/luxury|elegant|fashion/i.test(style)) {
-    fontUrl = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500&display=swap';
-    fontFamily = "'Playfair Display', 'Inter', serif";
+  if (/gold|yellow|luxury|premium|amber/i.test(style) || /gold|yellow/i.test(boundaries)) {
+    accent = '#f59e0b'; accentDark = '#d97706'; accentGlow = 'rgba(245,158,11,0.3)';
+  } else if (/green|emerald|eco|nature/i.test(style) || /green|emerald/i.test(boundaries)) {
+    accent = '#10b981'; accentDark = '#059669'; accentGlow = 'rgba(16,185,129,0.3)';
+  } else if (/purple|violet|creative|fuchsia/i.test(style) || /purple|violet/i.test(boundaries)) {
+    accent = '#8b5cf6'; accentDark = '#7c3aed'; accentGlow = 'rgba(139,92,246,0.3)';
+  } else if (/red|crimson|bold|rose/i.test(style) || /red|crimson|rose/i.test(boundaries)) {
+    accent = '#f43f5e'; accentDark = '#e11d48'; accentGlow = 'rgba(244,63,94,0.3)';
+  } else if (/orange|coral|sunset/i.test(style) || /orange|coral/i.test(boundaries)) {
+    accent = '#f97316'; accentDark = '#ea580c'; accentGlow = 'rgba(249,115,22,0.3)';
+  } else if (/cyan|teal|neon blue/i.test(style) || /cyan|teal/i.test(boundaries)) {
+    accent = '#06b6d4'; accentDark = '#0891b2'; accentGlow = 'rgba(6,182,212,0.3)';
   }
 
-  const siteName = scope.split(' ').slice(0, 3).join(' ');
+  // Fonts scan
+  let fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
+  let fontFamily = "'Inter', system-ui, sans-serif";
+  if (/luxury|elegant|fashion|serif|playfair/i.test(style)) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500&display=swap';
+    fontFamily = "'Playfair Display', serif";
+  } else if (/mono|tech|code|space/i.test(style)) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600&display=swap';
+    fontFamily = "'Fira Code', monospace";
+  }
+
+  // 5. Layout and Geometry Selection based on Template Name
+  let threeJSGeometrySetup = '';
+  let templateHeader = 'IMMERSIBLE 3D PLATFORM';
+  let featureCards = [];
+  let itemsShowcase = [];
+  let isModelViewerEnabled = !!glbFile;
+
+  const tLower = templateName.toLowerCase();
+
+  if (tLower.includes('showroom') || tLower.includes('commerce') || tLower.includes('shop')) {
+    // Torus Knot for Luxury Showroom
+    threeJSGeometrySetup = `
+      const geometry = new THREE.TorusKnotGeometry(1.4, 0.45, 120, 16);
+      const material = new THREE.MeshStandardMaterial({
+        color: "${accent}", roughness: 0.1, metalness: 0.9, flatShading: false
+      });
+    `;
+    templateHeader = '3D SHOWROOM';
+    featureCards = [
+      { icon: '🛋️', title: 'Interactive Catalog', desc: 'Inspect product dimensions, colors, and textures from any orbital angle.' },
+      { icon: '🏷️', title: 'Direct Pre-Order', desc: 'Secure custom tailored furniture items with embedded stripe-ready widgets.' },
+      { icon: '✨', title: 'Premium Crafting', desc: 'Curated organic materials designed to match elite interior environments.' }
+    ];
+    itemsShowcase = ['Elite Sofa Chair', 'Glass Coffee Table', 'Modern Office Lounge', 'Luxury Hanging Pendant'];
+  } 
+  else if (tLower.includes('architectural') || tLower.includes('real estate') || tLower.includes('house') || tLower.includes('gallery')) {
+    // Wireframe Box for Architecture Gallery
+    threeJSGeometrySetup = `
+      const geometry = new THREE.BoxGeometry(2, 2, 2, 4, 4, 4);
+      const material = new THREE.MeshBasicMaterial({
+        color: "${accent}", wireframe: true, transparent: true, opacity: 0.7
+      });
+    `;
+    templateHeader = 'ARCHITECTURAL FRAME';
+    featureCards = [
+      { icon: '🏠', title: '3D Floorplans', desc: 'Inspect volumetric spaces and room arrangements inside our viewport mesh.' },
+      { icon: '📍', title: 'Interactive Markers', desc: 'Clickable info hotspots mapping blueprint elevations onto live screens.' },
+      { icon: '🌱', title: 'Sustainable Core', desc: 'Energy metrics and material durability calculations built into design layouts.' }
+    ];
+    itemsShowcase = ['Contemporary Villa', 'Penthouse Layout', 'Eco duplex model', 'Corporate Workspace'];
+  } 
+  else if (tLower.includes('portfolio') || tLower.includes('creative') || tLower.includes('art')) {
+    // Icosahedron for Portfolio
+    threeJSGeometrySetup = `
+      const geometry = new THREE.IcosahedronGeometry(1.6, 1);
+      const material = new THREE.MeshStandardMaterial({
+        color: "${accent}", roughness: 0.2, metalness: 0.8, flatShading: true
+      });
+    `;
+    templateHeader = 'CREATIVE GALLERY';
+    featureCards = [
+      { icon: '⚡', title: 'Interactive Works', desc: 'Float and scale modular design units directly on mouse movement.' },
+      { icon: '🛠️', title: 'WebGL Integration', desc: 'High performance physics-backed layouts that load instantly on all browsers.' },
+      { icon: '📐', title: 'Technical Accuracy', desc: 'Responsive grid architecture built with extreme layout precision.' }
+    ];
+    itemsShowcase = ['Brand Identity Pack', 'WebGL Landing Mesh', 'Volumetric Render Spec', 'Interactive App UI'];
+  }
+  else if (tLower.includes('saas') || tLower.includes('dashboard') || tLower.includes('corporate')) {
+    // Octahedron for SaaS
+    threeJSGeometrySetup = `
+      const geometry = new THREE.OctahedronGeometry(1.5, 0);
+      const material = new THREE.MeshStandardMaterial({
+        color: "${accent}", wireframe: true, roughness: 0.3, metalness: 0.7
+      });
+    `;
+    templateHeader = 'SaaS PLATFORM MESH';
+    featureCards = [
+      { icon: '📈', title: 'Metric Dashboards', desc: 'Monitor active conversion analytics and traffic maps instantly.' },
+      { icon: '⚡', title: 'Blazing Performance', desc: 'Average load times under 0.8 seconds to optimize lead capture conversion.' },
+      { icon: '🔌', title: 'Integrations', desc: 'Connect database triggers, CRM triggers, and marketing tags cleanly.' }
+    ];
+    itemsShowcase = ['Conversion Trackers', 'Traffic Geo Heatmap', 'Volumetric Lead Engine', 'Cloud Metrics Board'];
+  }
+  else {
+    // Default Torus
+    threeJSGeometrySetup = `
+      const geometry = new THREE.TorusGeometry(1.2, 0.4, 16, 100);
+      const material = new THREE.MeshStandardMaterial({
+        color: "${accent}", roughness: 0.4, metalness: 0.7
+      });
+    `;
+    templateHeader = 'INTERACTIVE PREVIEW';
+    featureCards = [
+      { icon: '🚀', title: 'Fast Rendering', desc: 'WebGL rendering optimized for low latency and high frames.' },
+      { icon: '📱', title: 'Fluid Spacing', desc: 'Fully responsive CSS layout built with grid-based system variables.' },
+      { icon: '⚙️', title: 'Flexible Core', desc: 'Modify design elements easily with direct parameter edits.' }
+    ];
+    itemsShowcase = ['Core Solution A', 'Advanced Module B', 'Modular Package C', 'Custom Option D'];
+  }
+
+  // 6. Map answers List
   const answersList = Object.entries(answers);
   const q1Entry = answersList.find(([q]) => /product|service|model/i.test(q)) || answersList[0];
   const q1Answer = q1Entry ? q1Entry[1] : '3D products and services';
   const q3Entry = answersList.find(([q]) => /contact|email|form|chat/i.test(q)) || answersList[2];
   const q3Answer = q3Entry ? (!/no|none|not applicable/i.test(q3Entry[1])) : false;
+
+  // 7. Inject Logo HTML
+  let logoHtml = `<span class="nav-logo-text">${siteName}</span>`;
+  if (logoFile) {
+    logoHtml = `<img src="assets/${logoFile.filename || logoFile.originalname}" alt="${siteName}" style="height: 38px; max-width: 170px; object-fit: contain;">`;
+  }
+
+  // 8. Inject 3D Viewport HTML
+  let canvasOrViewerHtml = '';
+  if (isModelViewerEnabled) {
+    canvasOrViewerHtml = `
+      <model-viewer 
+        src="assets/${glbFile.filename || glbFile.originalname}" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        autoplay 
+        shadow-intensity="1" 
+        style="width: 100%; height: 100%; outline: none;"
+      ></model-viewer>
+    `;
+  } else {
+    canvasOrViewerHtml = `<canvas id="threeCanvas"></canvas>`;
+  }
+
+  // 9. Generate Product Cards showcasing uploaded images if present
+  let productsCardsHtml = '';
+  itemsShowcase.forEach((name, i) => {
+    // If we have uploaded images, use them for product previews
+    const userImg = imageFiles[i];
+    const imageHtml = userImg
+      ? `<img src="assets/${userImg.filename || userImg.originalname}" alt="${name}" class="card-image-display" style="width:100%; height:180px; object-fit:cover; border-radius:var(--radius); margin-bottom:1rem; border: 1px solid var(--border);">`
+      : `<div class="product-icon">${featureCards[i % featureCards.length].icon}</div>`;
+
+    productsCardsHtml += `
+      <div class="product-card">
+        ${imageHtml}
+        <h3>${name}</h3>
+        <p>Expertly aligned to achieve your core target goal: "${motive}".</p>
+      </div>
+    `;
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -80,17 +272,18 @@ const generateFallbackWebsite = (prompt, answers) => {
   <title>${siteName}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="${fontUrl}" />
+  ${isModelViewerEnabled ? '<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>' : ''}
   <style>
     :root {
       --accent: ${accent};
       --accent-dark: ${accentDark};
       --accent-glow: ${accentGlow};
-      --bg: #020617;
-      --bg2: #0f172a;
-      --bg3: #1e293b;
-      --border: rgba(255,255,255,0.08);
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
+      --bg: ${bg};
+      --bg2: ${bg2};
+      --bg3: ${bg3};
+      --border: ${border};
+      --text: ${text};
+      --text-muted: ${textMuted};
       --font: ${fontFamily};
       --radius: 1rem;
       --shadow: 0 20px 60px rgba(0,0,0,0.4);
@@ -107,12 +300,12 @@ const generateFallbackWebsite = (prompt, answers) => {
       background: rgba(2,6,23,0.85); backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
-    .nav-logo { font-size: 1.25rem; font-weight: 800; color: var(--accent); text-decoration: none; letter-spacing: -0.02em; }
+    .nav-logo { font-size: 1.25rem; font-weight: 800; color: var(--accent); text-decoration: none; letter-spacing: -0.02em; display: flex; align-items: center; }
     .nav-links { display: flex; gap: 2rem; list-style: none; }
     .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
-    .nav-cta { padding: 0.5rem 1.25rem; background: var(--accent); color: white; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: all 0.2s; box-shadow: 0 0 20px var(--accent-glow); }
-    .nav-cta:hover { background: var(--accent-dark); transform: scale(1.04); }
+    .nav-cta { padding: 0.5rem 1.25rem; background: var(--accent); color: ${isLight ? 'white' : 'black'}; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: all 0.2s; box-shadow: 0 0 20px var(--accent-glow); }
+    .nav-cta:hover { background: var(--accent-dark); transform: scale(1.04); color: white; }
     .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; }
     .hamburger span { width: 24px; height: 2px; background: var(--text); border-radius: 2px; transition: all 0.3s; }
     @media (max-width: 768px) {
@@ -123,28 +316,35 @@ const generateFallbackWebsite = (prompt, answers) => {
 
     /* ─── HERO ─── */
     #hero {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      text-align: center; padding: 8rem 5% 6rem;
-      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59,130,246,0.12) 0%, transparent 70%), var(--bg);
+      min-height: 100vh; display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: center;
+      padding: 8rem 5% 6rem; gap: 4rem;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, var(--accent-glow) 0%, transparent 70%), var(--bg);
       position: relative; overflow: hidden;
     }
-    #hero::before {
-      content: ''; position: absolute; inset: 0;
-      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      opacity: 0.4;
+    @media (max-width: 991px) {
+      #hero { grid-template-columns: 1fr; text-align: center; padding-top: 7rem; }
     }
-    .hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; border-radius: 9999px; border: 1px solid var(--accent); background: rgba(59,130,246,0.1); color: var(--accent); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.5rem; }
-    .hero-title { font-size: clamp(2.5rem, 6vw, 5rem); font-weight: 900; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 1.5rem; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; border-radius: 9999px; border: 1px solid var(--accent); background: rgba(59,130,246,0.05); color: var(--accent); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.5rem; }
+    .hero-title { font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 900; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 1.5rem; }
     .hero-title span { background: linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero-sub { font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-muted); max-width: 600px; margin: 0 auto 2.5rem; }
-    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-    .btn-primary { padding: 0.85rem 2rem; background: var(--accent); color: white; border-radius: 9999px; font-weight: 700; text-decoration: none; font-size: 1rem; transition: all 0.2s; box-shadow: 0 0 30px var(--accent-glow); }
-    .btn-primary:hover { background: var(--accent-dark); transform: translateY(-2px); box-shadow: 0 4px 30px var(--accent-glow); }
+    .hero-sub { font-size: clamp(1rem, 1.8vw, 1.2rem); color: var(--text-muted); max-width: 600px; margin-bottom: 2.5rem; }
+    @media (max-width: 991px) { .hero-sub { margin: 0 auto 2.5rem; } }
+    .hero-actions { display: flex; gap: 1rem; justify-content: flex-start; flex-wrap: wrap; }
+    @media (max-width: 991px) { .hero-actions { justify-content: center; } }
+    .btn-primary { padding: 0.85rem 2rem; background: var(--accent); color: ${isLight ? 'white' : 'black'}; border-radius: 9999px; font-weight: 700; text-decoration: none; font-size: 1rem; transition: all 0.2s; box-shadow: 0 0 30px var(--accent-glow); }
+    .btn-primary:hover { background: var(--accent-dark); transform: translateY(-2px); box-shadow: 0 4px 30px var(--accent-glow); color: white; }
     .btn-outline { padding: 0.85rem 2rem; border: 1px solid var(--border); color: var(--text); border-radius: 9999px; font-weight: 600; text-decoration: none; font-size: 1rem; transition: all 0.2s; background: transparent; }
     .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
+    .canvas-viewport {
+      height: 480px; position: relative; border-radius: 2rem; overflow: hidden;
+      background: radial-gradient(circle, var(--bg2) 0%, transparent 80%);
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    @media (max-width: 991px) { .canvas-viewport { height: 380px; max-width: 500px; width: 100%; margin: 0 auto; } }
+
     /* ─── SECTIONS ─── */
-    section { padding: 6rem 5%; }
+    section { padding: 7rem 5%; }
     .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 1rem; }
     .section-title { font-size: clamp(1.75rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; }
     .section-sub { font-size: 1.1rem; color: var(--text-muted); max-width: 560px; }
@@ -156,25 +356,25 @@ const generateFallbackWebsite = (prompt, answers) => {
     .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 0 auto; }
     .feature-card {
       background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 2rem; transition: all 0.3s; opacity: 0; transform: translateY(30px);
+      padding: 2.25rem; transition: all 0.3s; opacity: 0; transform: translateY(30px);
     }
     .feature-card.visible { opacity: 1; transform: translateY(0); }
     .feature-card:hover { border-color: var(--accent); transform: translateY(-6px); box-shadow: 0 12px 40px var(--accent-glow); }
     .feature-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-    .feature-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
     .feature-card p { color: var(--text-muted); font-size: 0.925rem; line-height: 1.7; }
 
     /* ─── ABOUT ─── */
     #about { background: var(--bg); }
     .about-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; max-width: 1100px; margin: 0 auto; }
-    .about-visual { background: linear-gradient(135deg, var(--bg2), var(--bg3)); border-radius: 1.5rem; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); font-size: 5rem; }
+    .about-visual { background: linear-gradient(135deg, var(--bg2), var(--bg3)); border-radius: 1.5rem; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); font-size: 5rem; box-shadow: var(--shadow); }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2.5rem; }
     .stat { background: var(--bg3); border-radius: 0.75rem; padding: 1.25rem; border: 1px solid var(--border); }
     .stat-value { font-size: 2rem; font-weight: 900; color: var(--accent); letter-spacing: -0.03em; }
     .stat-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
     @media (max-width: 768px) { .about-inner { grid-template-columns: 1fr; gap: 2.5rem; } }
 
-    /* ─── PRODUCTS / Q1 ─── */
+    /* ─── PRODUCTS / SERVICES ─── */
     #products { background: var(--bg2); }
     .products-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 2.5rem auto 0; }
     .product-card {
@@ -188,7 +388,7 @@ const generateFallbackWebsite = (prompt, answers) => {
     .product-card h3 { font-weight: 700; margin-bottom: 0.5rem; }
     .product-card p { color: var(--text-muted); font-size: 0.875rem; }
 
-    /* ─── CONTACT (conditional) ─── */
+    /* ─── CONTACT ─── */
     #contact { background: var(--bg); }
     .contact-inner { max-width: 640px; margin: 0 auto; }
     .contact-form { display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
@@ -202,8 +402,8 @@ const generateFallbackWebsite = (prompt, answers) => {
     }
     .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
     .form-group textarea { min-height: 120px; resize: vertical; }
-    .form-submit { padding: 0.85rem; background: var(--accent); color: white; border: none; border-radius: 9999px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; font-family: var(--font); }
-    .form-submit:hover { background: var(--accent-dark); }
+    .form-submit { padding: 0.85rem; background: var(--accent); color: ${isLight ? 'white' : 'black'}; border: none; border-radius: 9999px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; font-family: var(--font); }
+    .form-submit:hover { background: var(--accent-dark); color: white; }
     @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 
     /* ─── FOOTER ─── */
@@ -216,14 +416,14 @@ const generateFallbackWebsite = (prompt, answers) => {
 
   <!-- NAVBAR -->
   <nav id="navbar">
-    <a href="#hero" class="nav-logo">${siteName}</a>
+    <a href="#hero" class="nav-logo">${logoHtml}</a>
     <ul class="nav-links" id="navLinks">
       <li><a href="#features">Features</a></li>
       <li><a href="#about">About</a></li>
-      <li><a href="#products">Services</a></li>
+      <li><a href="#products">Catalog</a></li>
       ${q3Answer ? '<li><a href="#contact">Contact</a></li>' : ''}
     </ul>
-    <a href="#contact" class="nav-cta">Get Started</a>
+    <a href="#contact" class="nav-cta">Pre-Order</a>
     <div class="hamburger" id="hamburger" aria-label="Toggle menu" role="button" tabindex="0">
       <span></span><span></span><span></span>
     </div>
@@ -232,56 +432,36 @@ const generateFallbackWebsite = (prompt, answers) => {
   <!-- HERO -->
   <section id="hero">
     <div>
-      <div class="hero-badge">⚡ ${scope}</div>
+      <div class="hero-badge">⚡ ${templateHeader}</div>
       <h1 class="hero-title">
-        Built to<br/><span>${motive.split(' ').slice(0, 4).join(' ')}</span>
+        Custom Tailored<br/><span>${motive.split(' ').slice(0, 4).join(' ')}</span>
       </h1>
-      <p class="hero-sub">Experience the next generation of ${scope.toLowerCase()}. Designed to ${motive.toLowerCase()}.</p>
+      <p class="hero-sub">Experience the next generation of ${scope.toLowerCase()} design. Perfectly customized for styling: <b>"${style}"</b>.</p>
       <div class="hero-actions">
-        <a href="#products" class="btn-primary">Explore Now →</a>
+        <a href="#products" class="btn-primary">Explore Catalog →</a>
         <a href="#about" class="btn-outline">Learn More</a>
       </div>
+    </div>
+    <div class="canvas-viewport">
+      ${canvasOrViewerHtml}
     </div>
   </section>
 
   <!-- FEATURES -->
   <section id="features">
     <div class="features-header">
-      <div class="section-label">Why Choose Us</div>
-      <h2 class="section-title">Everything You Need</h2>
-      <p class="section-sub">We combine cutting-edge technology with beautiful design to deliver exceptional results.</p>
+      <div class="section-label">Tailored Performance</div>
+      <h2 class="section-title">Volume & Spacing Metrics</h2>
+      <p class="section-sub">We combine state of the art Three.js canvases with mobile-first CSS variables.</p>
     </div>
     <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">🚀</div>
-        <h3>Lightning Fast</h3>
-        <p>Optimized for peak performance, ensuring blazing-fast load times across all devices and networks.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📱</div>
-        <h3>Mobile First</h3>
-        <p>Every pixel is crafted for mobile devices first, then enhanced for larger screens seamlessly.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎨</div>
-        <h3>Premium Design</h3>
-        <p>Sleek, professional aesthetics that command attention and build immediate trust with visitors.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3>Secure & Reliable</h3>
-        <p>Built with security best practices and 99.9% uptime guarantee to keep your business running.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <h3>Analytics Ready</h3>
-        <p>Integrated analytics hooks let you track every interaction and continuously improve performance.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">⚙️</div>
-        <h3>Fully Customizable</h3>
-        <p>Every element is modular and configurable to match your brand identity perfectly.</p>
-      </div>
+      ${featureCards.map(fc => `
+        <div class="feature-card">
+          <div class="feature-icon">${fc.icon}</div>
+          <h3>${fc.title}</h3>
+          <p>${fc.desc}</p>
+        </div>
+      `).join('')}
     </div>
   </section>
 
@@ -289,15 +469,15 @@ const generateFallbackWebsite = (prompt, answers) => {
   <section id="about">
     <div class="about-inner">
       <div>
-        <div class="section-label">Our Story</div>
-        <h2 class="section-title">Who We Are</h2>
-        <p style="color:var(--text-muted); margin-bottom:1rem; line-height:1.8;">
-          We are a passionate team dedicated to delivering world-class ${scope.toLowerCase()} solutions. Our mission is to ${motive.toLowerCase()} while maintaining the highest standards of quality and innovation.
+        <div class="section-label">Our Philosophy</div>
+        <h2 class="section-title">Design with Precision</h2>
+        <p style="color:var(--text-muted); margin-bottom:1.5rem; line-height:1.8;">
+          We believe that interactive 3D elements should enhance usability, not get in the way of sales. That's why every project features orbital zoom locks and mobile-responsive viewport scaling.
         </p>
         <div class="stats-grid">
-          <div class="stat"><div class="stat-value">500+</div><div class="stat-label">Clients</div></div>
-          <div class="stat"><div class="stat-value">98%</div><div class="stat-label">Satisfaction</div></div>
-          <div class="stat"><div class="stat-value">10+</div><div class="stat-label">Years Exp.</div></div>
+          <div class="stat"><div class="stat-value">500+</div><div class="stat-label">Deployments</div></div>
+          <div class="stat"><div class="stat-value">0.8s</div><div class="stat-label">Load Time</div></div>
+          <div class="stat"><div class="stat-value">100%</div><div class="stat-label">Volumetric</div></div>
           <div class="stat"><div class="stat-value">24/7</div><div class="stat-label">Support</div></div>
         </div>
       </div>
@@ -305,28 +485,23 @@ const generateFallbackWebsite = (prompt, answers) => {
     </div>
   </section>
 
-  <!-- PRODUCTS / SERVICES -->
+  <!-- PRODUCTS / CATALOG -->
   <section id="products">
-    <div class="section-label" style="text-align:center">What We Offer</div>
-    <h2 class="section-title" style="text-align:center;margin-bottom:0.5rem">Our Services</h2>
-    <p class="section-sub" style="text-align:center;margin:0 auto 0.5rem">Featuring: ${q1Answer}</p>
+    <div class="section-label" style="text-align:center">Showcase</div>
+    <h2 class="section-title" style="text-align:center;margin-bottom:0.5rem">Featured Items</h2>
+    <p class="section-sub" style="text-align:center;margin:0 auto 2rem">Featuring answers context: "${q1Answer}"</p>
     <div class="products-grid">
-      ${['Premium Plan', 'Standard Plan', 'Enterprise Plan', 'Custom Solution'].map((name, i) => `
-      <div class="product-card">
-        <div class="product-icon">${['✦', '◈', '⬡', '★'][i]}</div>
-        <h3>${name}</h3>
-        <p>Tailored ${scope.toLowerCase()} solutions designed to maximize your results and exceed expectations.</p>
-      </div>`).join('')}
+      ${productsCardsHtml}
     </div>
   </section>
 
-  <!-- CONTACT (if Q3 answered yes) -->
+  <!-- CONTACT -->
   ${q3Answer ? `
   <section id="contact">
     <div class="contact-inner">
       <div class="section-label">Get In Touch</div>
-      <h2 class="section-title">Contact Us</h2>
-      <p class="section-sub">Have a question or ready to get started? Send us a message.</p>
+      <h2 class="section-title">Contact Showroom</h2>
+      <p class="section-sub">Have custom queries or request styling alterations? Book an orbital custom consultation.</p>
       <form class="contact-form" onsubmit="handleSubmit(event)">
         <div class="form-row">
           <div class="form-group">
@@ -340,7 +515,7 @@ const generateFallbackWebsite = (prompt, answers) => {
         </div>
         <div class="form-group">
           <label for="message">Message</label>
-          <textarea id="message" name="message" placeholder="Tell us about your project..." required></textarea>
+          <textarea id="message" name="message" placeholder="Describe your custom layout requests..." required></textarea>
         </div>
         <button type="submit" class="form-submit">Send Message →</button>
       </form>
@@ -349,11 +524,98 @@ const generateFallbackWebsite = (prompt, answers) => {
 
   <!-- FOOTER -->
   <footer>
-    <p>© ${new Date().getFullYear()} <a href="#hero">${siteName}</a>. All rights reserved. Built with ❤️ by MobileFirst3D.</p>
+    <p>© ${new Date().getFullYear()} <a href="#hero">${siteName}</a>. All rights reserved. Powered by MobileFirst3D.</p>
   </footer>
 
+  ${!isModelViewerEnabled ? `
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // Hamburger menu
+    const container = document.querySelector('.canvas-viewport');
+    const canvas = document.getElementById('threeCanvas');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.z = 8;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Dynamic Geometry Injection based on template layout choice
+    ${threeJSGeometrySetup}
+
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+
+    // Setup basic standard light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dirLight2.position.set(-5, -5, 5);
+    scene.add(dirLight2);
+
+    // Interactive mouse rotation drag controllers
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+
+    canvas.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mousemove', (e) => {
+      const deltaMove = {
+        x: e.offsetX - previousMousePosition.x,
+        y: e.offsetY - previousMousePosition.y
+      };
+      if (isDragging) {
+        mesh.rotation.y += deltaMove.x * 0.005;
+        mesh.rotation.x += deltaMove.y * 0.005;
+      }
+      previousMousePosition = { x: e.offsetX, y: e.offsetY };
+    });
+
+    // Touch support for mobile layouts
+    canvas.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      const touch = e.touches[0];
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+    window.addEventListener('touchend', () => isDragging = false);
+    canvas.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const touch = e.touches[0];
+      const deltaMove = {
+        x: touch.clientX - previousMousePosition.x,
+        y: touch.clientY - previousMousePosition.y
+      };
+      mesh.rotation.y += deltaMove.x * 0.01;
+      mesh.rotation.x += deltaMove.y * 0.01;
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+
+    // Rotation anim loop
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!isDragging) {
+        mesh.rotation.y += 0.005;
+        mesh.rotation.x += 0.002;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+  ` : ''}
+
+  <script>
+    // Hamburger menu toggle
     const hamburger = document.getElementById('hamburger');
     const navLinks = document.getElementById('navLinks');
     hamburger.addEventListener('click', () => navLinks.classList.toggle('open'));
@@ -362,18 +624,18 @@ const generateFallbackWebsite = (prompt, answers) => {
     // Close menu on link click
     navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
 
-    // Scroll animations
-    const observer = new IntersectionObserver((entries) => {
+    // Simple Intersection Observer to fade in features on scroll
+    const obs = new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
     }, { threshold: 0.15 });
-    document.querySelectorAll('.feature-card, .product-card').forEach(el => observer.observe(el));
+    document.querySelectorAll('.feature-card, .product-card').forEach(el => obs.observe(el));
 
-    // Stagger animations
+    // Stagger transition animations
     document.querySelectorAll('.feature-card, .product-card').forEach((el, i) => {
       el.style.transitionDelay = \`\${i * 0.08}s\`;
     });
 
-    // Contact form handler
+    // Handle contact form submit
     function handleSubmit(e) {
       e.preventDefault();
       const btn = e.target.querySelector('.form-submit');
@@ -383,7 +645,7 @@ const generateFallbackWebsite = (prompt, answers) => {
       setTimeout(() => { btn.textContent = 'Send Message →'; btn.style.background = ''; }, 3000);
     }
 
-    // Smooth scroll for CTA
+    // Scroll smoothing
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', (e) => {
         e.preventDefault();

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creative Portfolio Template Preview</title>
+  <style>
+    :root {
+      --accent: #8b5cf6;
+      --bg: #0b0f19;
+      --bg-card: #151c2c;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 5%;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 80vh;
+      align-items: center;
+      padding: 0 5%;
+      gap: 4rem;
+    }
+    @media (max-width: 768px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding-top: 4rem;
+        gap: 2rem;
+      }
+    }
+    .hero-content h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+    .hero-content h1 span {
+      color: var(--accent);
+    }
+    .hero-content p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.8rem 2rem;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      font-weight: 700;
+      border-radius: 9999px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+    }
+    .viewer-container {
+      height: 450px;
+      position: relative;
+      background: radial-gradient(circle, var(--bg-card) 0%, transparent 70%);
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.4rem 1rem;
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--accent);
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">CREATIVE</div>
+    <ul class="nav-links">
+      <li><a href="#">Works</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Contact</a></li>
+    </ul>
+    <a href="#" class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">Let's Talk</a>
+  </header>
+
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">TEMPLATE PREVIEW</div>
+      <h1>Creative Showcase <span>3D Canvas</span></h1>
+      <p>This is a live preview of the Creative Portfolio template. The final generated code will feature custom project sliders, bio sections, and floating interactive mesh configurations.</p>
+      <a href="#" class="btn">Explore Customizer</a>
+    </div>
+    <div class="viewer-container">
+      <canvas id="fallbackCanvas"></canvas>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const container = document.querySelector('.viewer-container');
+    const canvas = document.getElementById('fallbackCanvas');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.z = 8;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Creative Geometric sphere/octahedron preview
+    const geometry = new THREE.IcosahedronGeometry(1.6, 1);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x8b5cf6,
+      roughness: 0.2,
+      metalness: 0.9,
+      flatShading: true
+    });
+    const sphere = new THREE.Mesh(geometry, material);
+    scene.add(sphere);
+
+    // Outer Wireframe Shell
+    const shellGeom = new THREE.IcosahedronGeometry(1.8, 1);
+    const shellMat = new THREE.MeshBasicMaterial({
+      color: 0x8b5cf6,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.15
+    });
+    const shell = new THREE.Mesh(shellGeom, shellMat);
+    scene.add(shell);
+
+    // Light source
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    const pointLight = new THREE.PointLight(0x8b5cf6, 2, 50);
+    pointLight.position.set(-3, 3, 3);
+    scene.add(pointLight);
+
+    // Drag control
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    
+    canvas.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mousemove', (e) => {
+      const deltaMove = {
+        x: e.offsetX - previousMousePosition.x,
+        y: e.offsetY - previousMousePosition.y
+      };
+      if (isDragging) {
+        sphere.rotation.y += deltaMove.x * 0.005;
+        sphere.rotation.x += deltaMove.y * 0.005;
+        shell.rotation.y += deltaMove.x * 0.002;
+      }
+      previousMousePosition = { x: e.offsetX, y: e.offsetY };
+    });
+
+    // Handle touch
+    canvas.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      const touch = e.touches[0];
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+    window.addEventListener('touchend', () => isDragging = false);
+    canvas.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const touch = e.touches[0];
+      const deltaMove = {
+        x: touch.clientX - previousMousePosition.x,
+        y: touch.clientY - previousMousePosition.y
+      };
+      sphere.rotation.y += deltaMove.x * 0.01;
+      sphere.rotation.x += deltaMove.y * 0.01;
+      shell.rotation.y += deltaMove.x * 0.004;
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!isDragging) {
+        sphere.rotation.y += 0.004;
+        sphere.rotation.x += 0.002;
+        shell.rotation.y -= 0.001;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+</body>
+</html>

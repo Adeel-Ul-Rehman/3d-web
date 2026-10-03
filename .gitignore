@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+.env.local
 .DS_Store
 *.log
 npm-debug.log*
@@ -8,3 +9,15 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .vscode/
+
+# Ignore scratch files
+prp.txt
+
+# Generated project files & uploads
+backend/generated/*
+!backend/generated/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

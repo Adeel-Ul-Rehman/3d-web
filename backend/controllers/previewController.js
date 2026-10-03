@@ -2,6 +2,8 @@ import path from 'path';
 import fs from 'fs-extra';
 import { CONSTANTS } from '../utils/constants.js';
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+
 export const getPreview = async (req, res, next) => {
   try {
     const { projectId } = req.params;
@@ -31,8 +33,25 @@ export const getPreview = async (req, res, next) => {
       html = html.replace('</body>', `<script>\n${js}\n</script>\n</body>`);
     }
 
+    // ✅ FIX: Rewrite relative asset paths to absolute backend URLs
+    // Generated HTML uses: src="assets/logo.png"
+    // This rewrites to: http://localhost:5000/api/preview/{projectId}/assets/logo.png
+    // so images and 3D models load correctly inside iframes and new tabs
+    const assetBaseUrl = `${BASE_URL}/api/preview/${projectId}/assets`;
+    html = html.replace(
+      /\b(src|href)="assets\/([^"]+)"/gi,
+      (match, attr, filename) => `${attr}="${assetBaseUrl}/${filename}"`
+    );
+    // Also handle model-viewer src attribute
+    html = html.replace(
+      /\bsrc="assets\/([^"]+\.(?:glb|gltf))"/gi,
+      (match, filename) => `src="${assetBaseUrl}/${filename}"`
+    );
+
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // Allow embedding in iframes from any origin (needed for preview modal)
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.send(html);
   } catch (error) {
     next(error);

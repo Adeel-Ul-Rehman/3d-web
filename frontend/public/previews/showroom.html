@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Luxury Showroom Template Preview</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <style>
+    :root {
+      --accent: #f59e0b;
+      --bg: #0b0f19;
+      --bg-card: #151c2c;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 5%;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 80vh;
+      align-items: center;
+      padding: 0 5%;
+      gap: 4rem;
+    }
+    @media (max-width: 768px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding-top: 4rem;
+        gap: 2rem;
+      }
+    }
+    .hero-content h1 {
+      font-size: 3.5rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+    .hero-content h1 span {
+      color: var(--accent);
+    }
+    .hero-content p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.8rem 2rem;
+      background: var(--accent);
+      color: black;
+      text-decoration: none;
+      font-weight: 700;
+      border-radius: 9999px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+    }
+    .viewer-container {
+      height: 450px;
+      position: relative;
+      background: radial-gradient(circle, var(--bg-card) 0%, transparent 70%);
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    model-viewer, canvas {
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.4rem 1rem;
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--accent);
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">LUXE3D</div>
+    <ul class="nav-links">
+      <li><a href="#">Catalog</a></li>
+      <li><a href="#">Materials</a></li>
+      <li><a href="#">Showroom</a></li>
+    </ul>
+    <a href="#" class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">Pre-Order</a>
+  </header>
+
+  <div class="hero">
+    <div class="hero-content">
+      <div class="badge">TEMPLATE PREVIEW</div>
+      <h1>Luxury Showroom <span>3D Canvas</span></h1>
+      <p>This is a live preview of the E-Commerce Showroom template. The final generated version will be customized using your brand assets, logo, colors, and styling rules.</p>
+      <a href="#" class="btn">Explore Customizer</a>
+    </div>
+    <div class="viewer-container">
+      <!-- Fallback procedural canvas since local GLB might load slow -->
+      <canvas id="fallbackCanvas"></canvas>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // Procedural Three.js Golden Mesh preview
+    const container = document.querySelector('.viewer-container');
+    const canvas = document.getElementById('fallbackCanvas');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.z = 8;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Golden Torus Knot (Luxurious)
+    const geometry = new THREE.TorusKnotGeometry(1.5, 0.4, 120, 16);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      roughness: 0.1,
+      metalness: 0.9,
+      flatShading: false
+    });
+    const knot = new THREE.Mesh(geometry, material);
+    scene.add(knot);
+
+    // Light source
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dirLight2.position.set(-5, -5, 5);
+    scene.add(dirLight2);
+
+    // Interaction control
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    
+    canvas.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mousemove', (e) => {
+      const deltaMove = {
+        x: e.offsetX - previousMousePosition.x,
+        y: e.offsetY - previousMousePosition.y
+      };
+      if (isDragging) {
+        knot.rotation.y += deltaMove.x * 0.005;
+        knot.rotation.x += deltaMove.y * 0.005;
+      }
+      previousMousePosition = { x: e.offsetX, y: e.offsetY };
+    });
+
+    // Handle touch
+    canvas.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      const touch = e.touches[0];
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+    window.addEventListener('touchend', () => isDragging = false);
+    canvas.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const touch = e.touches[0];
+      const deltaMove = {
+        x: touch.clientX - previousMousePosition.x,
+        y: touch.clientY - previousMousePosition.y
+      };
+      knot.rotation.y += deltaMove.x * 0.01;
+      knot.rotation.x += deltaMove.y * 0.01;
+      previousMousePosition = { x: touch.clientX, y: touch.clientY };
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!isDragging) {
+        knot.rotation.y += 0.005;
+        knot.rotation.x += 0.002;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+</body>
+</html>

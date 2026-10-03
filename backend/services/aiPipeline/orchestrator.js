@@ -6,32 +6,39 @@ import { generateProjectId } from '../../utils/helpers.js';
 import { CONSTANTS } from '../../utils/constants.js';
 
 export const runGenerationPipeline = async (userData) => {
-  const { template, prompt, answers, files } = userData;
+  const { template, templateName, prompt, answers, files } = userData;
 
   console.log('[Pipeline] Starting generation pipeline...');
+  console.log('[Pipeline] Template name:', templateName);
+  console.log('[Pipeline] Files received:', (files || []).length);
 
-  // Step 1: Enhance Prompt
+  // Step 1: Enhance Prompt (inject template name into prompt context)
   console.log('[Pipeline] Step 1: Enhancing prompt...');
-  const enhancedPrompt = await enhancePrompt(prompt);
+  const enhancedPrompt = await enhancePrompt(prompt, templateName);
 
   // Step 2: Generate + Validate loop
   console.log('[Pipeline] Step 2-5: Running generate/validate loop...');
   const result = await loopController({
     enhancedPrompt,
     answers,
-    template,
+    template: templateName,   // Pass the resolved name string
+    files: files || [],
     maxIterations: CONSTANTS.MAX_ITERATIONS,
     threshold: CONSTANTS.QUALITY_THRESHOLD,
   });
 
-  // Step 3: Save generated files
+  // Step 3: Save generated files + uploaded assets
   const projectId = generateProjectId();
   console.log(`[Pipeline] Step 6: Saving files for project ${projectId}...`);
   const projectPath = await saveGeneratedFiles(projectId, {
     html: result.html,
     css: result.css,
     js: result.js,
-    assets: (files || []).map(f => ({ filename: f.filename || f.originalname, buffer: f.buffer })),
+    assets: (files || []).map(f => ({
+      // Use originalname as the filename on disk
+      filename: f.filename || f.originalname,
+      buffer: f.buffer,
+    })),
   });
 
   // Step 4: Create ZIP archive
@@ -53,6 +60,7 @@ export const runGenerationPipeline = async (userData) => {
     suggestions: result.suggestions,
     iterationHistory: result.iterationHistory,
     template,
+    templateName,
     prompt,
     answers,
   };

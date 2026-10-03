@@ -5,6 +5,7 @@ export const loopController = async ({
   enhancedPrompt,
   answers,
   template,
+  files = [],
   maxIterations = 3,
   threshold = 85,
 }) => {
@@ -19,7 +20,7 @@ export const loopController = async ({
     iteration++;
     console.log(`[Loop] Iteration ${iteration}/${maxIterations}`);
 
-    const code = await generateCode(currentPrompt, answers);
+    const code = await generateCode(currentPrompt, answers, template, files);
     const validationResult = await validateCode(code.html, code.css, code.js, enhancedPrompt);
 
     iterationHistory.push({

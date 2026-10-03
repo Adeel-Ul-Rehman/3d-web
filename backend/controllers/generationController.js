@@ -31,17 +31,34 @@ export const generateWebsite = async (req, res, next) => {
       return next(err);
     }
 
+    // Parse all JSON strings that arrive via FormData
     const parsedPrompt = typeof prompt === 'string' ? JSON.parse(prompt) : prompt;
     const parsedAnswers = typeof answers === 'string' ? JSON.parse(answers) : (answers || {});
 
+    // ✅ FIX: Parse the template (it arrives as JSON-stringified object from FormData)
+    // Extract the template name as a plain string for the code generator
+    let parsedTemplate = {};
+    try {
+      parsedTemplate = typeof template === 'string' ? JSON.parse(template) : (template || {});
+    } catch (_) {
+      parsedTemplate = {};
+    }
+    const templateName = parsedTemplate.name || parsedTemplate || 'default';
+
     console.log('[GenerationController] Starting pipeline for:', parsedPrompt.scope);
+    console.log('[GenerationController] Template:', templateName);
+    console.log('[GenerationController] Files:', files.length);
 
     const result = await runGenerationPipeline({
-      template: template || 'default',
+      // Pass the full template object AND the resolved name string
+      template: parsedTemplate,
+      templateName: templateName,
       prompt: parsedPrompt,
       answers: parsedAnswers,
       files: files.map(f => ({
+        // Preserve both names — originalname is reliable from multer memory storage
         filename: f.originalname,
+        originalname: f.originalname,
         buffer: f.buffer,
         mimetype: f.mimetype,
         size: f.size,
